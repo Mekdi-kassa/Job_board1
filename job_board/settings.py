@@ -286,6 +286,8 @@ else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'noreply@jobboard.com'
 
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', 5))
+
 # ============================================================
 # EMAIL VERIFICATION SETTINGS
 # ============================================================

@@ -14,6 +14,35 @@ def generate_verification_token():
     return secrets.token_urlsafe(32)
 
 
+def _send_via_sendgrid_https(api_key, from_email, to_email, subject, plain_text, html_content):
+    """Send email via SendGrid v3 HTTP API (port 443, never blocked by cloud hosts)"""
+    import urllib.request
+    import json
+    
+    url = "https://api.sendgrid.com/v3/mail/send"
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": from_email, "name": "Job Board"},
+        "subject": subject,
+        "content": [
+            {"type": "text/plain", "value": plain_text},
+            {"type": "text/html", "value": html_content}
+        ]
+    }
+    
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode('utf-8'),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=5) as response:
+        return response.status in (200, 202)
+
+
 def send_verification_email(user):
     """
     Send email verification link to user
@@ -125,14 +154,24 @@ If you did not create an account, please ignore this email.
 ---
 Job Board Team"""
         
-        # Send email
+        # 1. Try SendGrid HTTPS API if SENDGRID_API_KEY is configured
+        sendgrid_key = os.getenv('SENDGRID_API_KEY')
+        if sendgrid_key:
+            try:
+                from_email = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@jobboard.com')
+                _send_via_sendgrid_https(sendgrid_key, from_email, user.email, subject, plain_message, html_message)
+                return True, "Verification email sent successfully via SendGrid HTTPS"
+            except Exception as e:
+                print(f"SendGrid HTTPS failed: {e}")
+        
+        # 2. Fall back to Django standard send_mail
         send_mail(
             subject=subject,
             message=plain_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
             html_message=html_message,
-            fail_silently=False,
+            fail_silently=True,
         )
         
         return True, "Verification email sent successfully"

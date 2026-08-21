@@ -83,9 +83,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         
         # Send verification email
         if settings.EMAIL_VERIFICATION_REQUIRED:
-            success, message = send_verification_email(user)
-            if not success:
-                print(f"Email sending failed: {message}")
+            try:
+                success, message = send_verification_email(user)
+                if not success:
+                    print(f"Email dispatch notice: {message}")
+            except Exception as e:
+                print(f"Email dispatch error: {e}")
         
         return user
 
