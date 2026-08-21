@@ -17,6 +17,7 @@ def generate_verification_token():
 def _send_via_sendgrid_https(api_key, from_email, to_email, subject, plain_text, html_content):
     """Send email via SendGrid v3 HTTP API (port 443, never blocked by cloud hosts)"""
     import urllib.request
+    import urllib.error
     import json
     
     url = "https://api.sendgrid.com/v3/mail/send"
@@ -34,13 +35,61 @@ def _send_via_sendgrid_https(api_key, from_email, to_email, subject, plain_text,
         url,
         data=json.dumps(payload).encode('utf-8'),
         headers={
-            "Authorization": f"Bearer {api_key}",
+            "Authorization": f"Bearer {api_key.strip()}",
+            "Content-Type": "application/json",
+            "User-Agent": "JobBoard-App/1.0"
+        },
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            print(f"📧 SendGrid response status: {response.status}")
+            return response.status in (200, 202)
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8', errors='ignore')
+        print(f"❌ SendGrid HTTP Error {e.code}: {err_body}")
+        raise
+    except Exception as e:
+        print(f"❌ SendGrid Connection Error: {e}")
+        raise
+
+
+def _send_via_resend_https(api_key, from_email, to_email, subject, plain_text, html_content):
+    """Send email via Resend HTTP API (port 443, free and instant)"""
+    import urllib.request
+    import urllib.error
+    import json
+    
+    url = "https://api.resend.com/emails"
+    from_addr = from_email if ('@' in from_email and not from_email.endswith('@gmail.com')) else "onboarding@resend.dev"
+    payload = {
+        "from": f"Job Board <{from_addr}>",
+        "to": [to_email],
+        "subject": subject,
+        "html": html_content,
+        "text": plain_text
+    }
+    
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode('utf-8'),
+        headers={
+            "Authorization": f"Bearer {api_key.strip()}",
             "Content-Type": "application/json"
         },
         method="POST"
     )
-    with urllib.request.urlopen(req, timeout=5) as response:
-        return response.status in (200, 202)
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            print(f"📧 Resend response status: {response.status}")
+            return response.status in (200, 201)
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8', errors='ignore')
+        print(f"❌ Resend HTTP Error {e.code}: {err_body}")
+        raise
+    except Exception as e:
+        print(f"❌ Resend Connection Error: {e}")
+        raise
 
 
 def send_verification_email(user):
@@ -154,7 +203,17 @@ If you did not create an account, please ignore this email.
 ---
 Job Board Team"""
         
-        # 1. Try SendGrid HTTPS API if SENDGRID_API_KEY is configured
+        # 1. Try Resend HTTPS API if RESEND_API_KEY is configured
+        resend_key = os.getenv('RESEND_API_KEY')
+        if resend_key:
+            try:
+                from_email = os.getenv('DEFAULT_FROM_EMAIL', 'onboarding@resend.dev')
+                _send_via_resend_https(resend_key, from_email, user.email, subject, plain_message, html_message)
+                return True, "Verification email sent successfully via Resend HTTPS"
+            except Exception as e:
+                print(f"Resend HTTPS failed: {e}")
+
+        # 2. Try SendGrid HTTPS API if SENDGRID_API_KEY is configured
         sendgrid_key = os.getenv('SENDGRID_API_KEY')
         if sendgrid_key:
             try:
