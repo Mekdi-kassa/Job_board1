@@ -4,6 +4,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.utils import timezone
+import os
 import secrets
 import hashlib
 
@@ -32,8 +33,14 @@ def send_verification_email(user):
         
         # Build verification links
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        render_host = getattr(settings, 'RENDER_EXTERNAL_HOSTNAME', None) or os.getenv('RENDER_EXTERNAL_HOSTNAME')
+        if render_host:
+            backend_url = f"https://{render_host}"
+        else:
+            backend_url = os.getenv('BACKEND_URL', 'http://localhost:8000')
+            
         verification_link = f"{frontend_url}/verify-email?token={token}&email={user.email}"
-        direct_api_link = f"http://localhost:8000/api/auth/verify-email/?token={token}&email={user.email}"
+        direct_api_link = f"{backend_url}/api/auth/verify-email/?token={token}&email={user.email}"
         
         # Email subject
         subject = "🎯 Verify Your Email - Job Board"
