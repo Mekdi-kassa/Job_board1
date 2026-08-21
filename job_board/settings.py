@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'applications',
     'profiles',
     'search',
+    'dashboard',
 ]
 
 # ============================================================

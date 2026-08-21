@@ -22,6 +22,9 @@ urlpatterns = [
     
     # Search & Discovery engine (unified search, autocomplete suggestions, facets, trending)
     path('api/search/', include('search.urls')),
+    
+    # Dashboards & Analytics (Company hiring pipeline, applicant tracker, admin platform analytics)
+    path('api/dashboard/', include('dashboard.urls')),
 ]
 
 # Serve media files in development
