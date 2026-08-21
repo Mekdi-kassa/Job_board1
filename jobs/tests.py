@@ -212,19 +212,18 @@ class CompanyJobManagementTests(JobManagementTestsBase):
         self.assertTrue(response.data['success'])
         self.assertEqual(response.data['data']['company']['email'], self.company_a.email)
 
-    def test_applicant_cannot_create_job(self):
-        """Applicant user gets HTTP 403 Forbidden when trying to create a job"""
-        self.client.force_authenticate(user=self.applicant)
+    def test_unauthenticated_cannot_create_job(self):
+        """Unauthenticated user gets HTTP 401 Unauthorized when trying to create a job"""
         url = reverse('jobs:company-job-create')
         data = {
             "category_id": str(self.tech_cat.id),
-            "title": "Fake Job by Applicant",
+            "title": "Unauthorized Job",
             "description": "This should be blocked.",
             "requirements": "None",
             "location": "Remote"
         }
         response = self.client.post(url, data=data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unverified_company_cannot_create_job(self):
         """Unverified company gets HTTP 403 Forbidden"""

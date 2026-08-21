@@ -69,8 +69,7 @@ class Job(models.Model):
     company = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='jobs',
-        limit_choices_to={'role': 'company'}
+        related_name='jobs'
     )
     category = models.ForeignKey(
         Category,
