@@ -10,6 +10,9 @@ urlpatterns = [
     
     # User app (all user-related endpoints)
     path('api/', include('user.urls')),  # This includes all user URLs
+    
+    # Jobs app (all job postings, categories, search, company job management)
+    path('api/jobs/', include('jobs.urls')),
 ]
 
 # Serve media files in development
