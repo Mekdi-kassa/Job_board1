@@ -28,6 +28,9 @@ urlpatterns = [
     
     # In-App Notifications & Email Alerts
     path('api/notifications/', include('notifications.urls')),
+    
+    # Reports & Super Admin Moderation Console
+    path('api/reports/', include('reports.urls')),
 ]
 
 # Serve media files in development
