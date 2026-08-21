@@ -16,6 +16,9 @@ urlpatterns = [
     
     # Applications app (job applications, applicant tracking, company candidate review pipeline)
     path('api/applications/', include('applications.urls')),
+    
+    # Profiles app (company branding showcase, applicant resumes, skills, experience, education)
+    path('api/profiles/', include('profiles.urls')),
 ]
 
 # Serve media files in development

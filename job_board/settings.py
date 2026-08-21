@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'user',
     'jobs',
     'applications',
+    'profiles',
 ]
 
 # ============================================================
