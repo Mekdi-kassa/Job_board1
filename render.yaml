@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: job-board-api
+    runtime: python
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn job_board.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "465"
+      - key: EMAIL_USE_SSL
+        value: "True"
+      - key: EMAIL_USE_TLS
+        value: "False"
+      - key: EMAIL_VERIFICATION_REQUIRED
+        value: "True"
+      - key: EMAIL_VERIFICATION_TIMEOUT_DAYS
+        value: "7"
