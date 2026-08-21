@@ -217,7 +217,9 @@ Job Board Team"""
         sendgrid_key = os.getenv('SENDGRID_API_KEY')
         if sendgrid_key:
             try:
-                from_email = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@jobboard.com')
+                from_email = os.getenv('DEFAULT_FROM_EMAIL', 'mekdelawitkassa6@gmail.com')
+                if not from_email or 'noreply' in from_email:
+                    from_email = 'mekdelawitkassa6@gmail.com'
                 _send_via_sendgrid_https(sendgrid_key, from_email, user.email, subject, plain_message, html_message)
                 return True, "Verification email sent successfully via SendGrid HTTPS"
             except Exception as e:
