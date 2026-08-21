@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     # Our apps
     'user',
     'jobs',
+    'applications',
 ]
 
 # ============================================================
