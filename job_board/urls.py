@@ -19,6 +19,9 @@ urlpatterns = [
     
     # Profiles app (company branding showcase, applicant resumes, skills, experience, education)
     path('api/profiles/', include('profiles.urls')),
+    
+    # Search & Discovery engine (unified search, autocomplete suggestions, facets, trending)
+    path('api/search/', include('search.urls')),
 ]
 
 # Serve media files in development
