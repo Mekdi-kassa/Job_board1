@@ -42,6 +42,14 @@ urlpatterns = [
     # POST /api/auth/resend-verification/
     path('auth/resend-verification/', views.ResendVerificationView.as_view(), name='resend-verification'),
     
+    # Password reset request
+    # POST /api/auth/password-reset/request/
+    path('auth/password-reset/request/', views.RequestPasswordResetView.as_view(), name='password-reset-request'),
+    
+    # Password reset confirm
+    # POST /api/auth/password-reset/confirm/
+    path('auth/password-reset/confirm/', views.ResetPasswordConfirmView.as_view(), name='password-reset-confirm'),
+    
     # ============================================================
     # PROFILE ENDPOINTS (Authenticated Users)
     # ============================================================

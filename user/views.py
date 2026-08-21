@@ -8,11 +8,17 @@ from django.contrib.auth import authenticate
 from .serializers import (
     RegisterSerializer, LoginSerializer, UserSerializer, 
     RefreshTokenSerializer, LogoutSerializer, VerifyEmailSerializer,
-    ResendVerificationSerializer
+    ResendVerificationSerializer, RequestPasswordResetSerializer,
+    ResetPasswordConfirmSerializer
 )
 from .permissions import IsSuperAdmin, IsCompany, IsApplicant
-from .utils import send_verification_email, verify_email_token
+from .utils import (
+    send_verification_email, verify_email_token,
+    send_password_reset_email, reset_password_with_token
+)
 from .models import User
+from django.http import HttpResponse
+import os
 import logging
 import traceback
 
@@ -98,7 +104,79 @@ class VerifyEmailView(APIView):
     
     def get(self, request):
         try:
-            return self._verify(request.query_params)
+            accept_header = request.headers.get('Accept', '')
+            wants_html = 'text/html' in accept_header and 'application/json' not in accept_header
+
+            serializer = VerifyEmailSerializer(data=request.query_params)
+            if serializer.is_valid():
+                user = serializer.validated_data['user']
+                token = serializer.validated_data['token']
+                success, message = verify_email_token(user, token)
+
+                if wants_html:
+                    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:8080')
+                    if success:
+                        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="3;url={frontend_url}/login">
+    <title>Email Verified - Job Board</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+    <div style="max-width: 480px; width: 90%; background: #ffffff; border-radius: 20px; padding: 40px 32px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+        <div style="width: 64px; height: 64px; background-color: #d1fae5; color: #059669; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 32px;">
+            ✓
+        </div>
+        <h1 style="color: #0f172a; font-size: 24px; font-weight: 700; margin: 20px 0 8px 0;">Email Verified!</h1>
+        <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+            Your account (<strong>{user.email}</strong>) is now verified and active.<br>
+            Redirecting you to sign in...
+        </p>
+        <a href="{frontend_url}/login" style="display: block; width: 100%; box-sizing: border-box; background-color: #2563eb; color: #ffffff !important; padding: 14px 24px; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 12px rgba(37,99,235,0.25);">
+            Proceed to Sign In →
+        </a>
+    </div>
+</body>
+</html>"""
+                        return HttpResponse(html_content, content_type="text/html")
+                    else:
+                        html_content = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Verification Failed</title></head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+    <div style="max-width: 480px; width: 90%; background: #ffffff; border-radius: 20px; padding: 40px 32px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+        <div style="width: 64px; height: 64px; background-color: #fee2e2; color: #dc2626; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 32px;">
+            ✕
+        </div>
+        <h1 style="color: #0f172a; font-size: 24px; font-weight: 700; margin: 20px 0 8px 0;">Verification Failed</h1>
+        <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 28px 0;">{message}</p>
+        <a href="{frontend_url}/login" style="display: block; width: 100%; box-sizing: border-box; background-color: #2563eb; color: #ffffff !important; padding: 14px 24px; text-decoration: none; border-radius: 12px; font-weight: 700; font-size: 16px;">
+            Go to Sign In
+        </a>
+    </div>
+</body>
+</html>"""
+                        return HttpResponse(html_content, content_type="text/html", status=400)
+
+                if success:
+                    return Response({
+                        'success': True,
+                        'message': message,
+                        'data': {
+                            'email': user.email,
+                            'verified_at': user.email_verified_at.isoformat() if user.email_verified_at else None
+                        }
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response({'success': False, 'message': message}, status=status.HTTP_400_BAD_REQUEST)
+
+            if wants_html:
+                return HttpResponse("<h3>Invalid verification link</h3>", content_type="text/html", status=400)
+
+            return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
         except Exception as e:
             logger.error(f"Email verification error: {str(e)}")
             return Response({
@@ -384,3 +462,58 @@ class SuspendUserView(APIView):
                 'success': False,
                 'message': 'User not found'
             }, status=status.HTTP_404_NOT_FOUND)
+
+
+class RequestPasswordResetView(APIView):
+    """Request Password Reset Link via Email"""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = RequestPasswordResetSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            user = User.objects.filter(email__iexact=email).first()
+            if user:
+                success, message = send_password_reset_email(user)
+                if success:
+                    return Response({
+                        'success': True,
+                        'message': 'Password reset link sent to your email.'
+                    }, status=status.HTTP_200_OK)
+                return Response({
+                    'success': False,
+                    'message': message
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ResetPasswordConfirmView(APIView):
+    """Confirm Password Reset with Token"""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = ResetPasswordConfirmSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.validated_data['user']
+            token = serializer.validated_data['token']
+            new_password = serializer.validated_data['new_password']
+
+            success, message = reset_password_with_token(user, token, new_password)
+            if success:
+                return Response({
+                    'success': True,
+                    'message': message
+                }, status=status.HTTP_200_OK)
+            return Response({
+                'success': False,
+                'message': message
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)

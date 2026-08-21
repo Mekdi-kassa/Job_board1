@@ -6,6 +6,7 @@ from django.db import transaction
 from django.conf import settings
 from .models import User
 from .utils import send_verification_email
+from .validators import validate_password_strength
 import bleach
 
 
@@ -28,12 +29,15 @@ class RegisterSerializer(serializers.ModelSerializer):
             'first_name': {'required': True},
             'last_name': {'required': True},
             'email': {'required': True},
-            'username': {'required': False, 'allow_blank': True, 'allow_null': True},  # ← Add this
+            'username': {'required': False, 'allow_blank': True, 'allow_null': True},
         }
     
     def validate(self, attrs):
         if attrs['password'] != attrs['confirm_password']:
             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+        
+        # Enforce strong password
+        validate_password_strength(attrs['password'])
         
         email = attrs.get('email', '').lower().strip()
         if User.objects.filter(email=email).exists():
@@ -101,9 +105,8 @@ class LoginSerializer(serializers.Serializer):
         email = attrs.get('email', '').lower().strip()
         password = attrs.get('password', '')
         
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
             raise serializers.ValidationError({"email": "Invalid email or password."})
         
         if user.is_suspended:
@@ -199,3 +202,36 @@ class RefreshTokenSerializer(TokenRefreshSerializer):
 
 class LogoutSerializer(serializers.Serializer):
     refresh = serializers.CharField()
+
+
+class RequestPasswordResetSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        email = value.lower().strip()
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            raise serializers.ValidationError("No account found with this email address.")
+        return email
+
+
+class ResetPasswordConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    token = serializers.CharField(max_length=255)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['confirm_password']:
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+        
+        # Enforce strong password
+        validate_password_strength(attrs['new_password'])
+
+        email = attrs.get('email', '').lower().strip()
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            raise serializers.ValidationError({"email": "No account found with this email address."})
+        
+        attrs['user'] = user
+        return attrs

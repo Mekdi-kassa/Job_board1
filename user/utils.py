@@ -110,15 +110,8 @@ def send_verification_email(user):
         user.save(update_fields=['email_verification_token', 'email_verification_sent_at'])
         
         # Build verification links
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-        render_host = getattr(settings, 'RENDER_EXTERNAL_HOSTNAME', None) or os.getenv('RENDER_EXTERNAL_HOSTNAME')
-        if render_host:
-            backend_url = f"https://{render_host}"
-        else:
-            backend_url = os.getenv('BACKEND_URL', 'http://localhost:8000')
-            
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:8080')
         verification_link = f"{frontend_url}/verify-email?token={token}&email={user.email}"
-        direct_api_link = f"{backend_url}/api/auth/verify-email/?token={token}&email={user.email}"
         
         # Email subject
         subject = "🎯 Verify Your Email - Job Board"
@@ -154,7 +147,7 @@ def send_verification_email(user):
                             
                             <!-- Primary Button -->
                             <div style="text-align: center; margin: 32px 0;">
-                                <a href="{direct_api_link}" style="background-color: #2563eb; color: #ffffff !important; display: inline-block; padding: 16px 36px; font-size: 16px; font-weight: 700; text-decoration: none; border-radius: 8px; box-shadow: 0 4px 8px rgba(37,99,235,0.25);">
+                                <a href="{verification_link}" style="background-color: #2563eb; color: #ffffff !important; display: inline-block; padding: 16px 36px; font-size: 16px; font-weight: 700; text-decoration: none; border-radius: 8px; box-shadow: 0 4px 8px rgba(37,99,235,0.25);">
                                     ✅ Verify Email Address
                                 </a>
                             </div>
@@ -162,8 +155,8 @@ def send_verification_email(user):
                             <!-- Fallback Link -->
                             <div style="margin: 28px 0; padding: 16px; background-color: #f8fafc; border-left: 4px solid #2563eb; border-radius: 4px;">
                                 <p style="margin: 0 0 8px 0; color: #334155; font-size: 13px; font-weight: 600;">Or copy and paste this link in your browser:</p>
-                                <a href="{direct_api_link}" style="color: #2563eb; font-size: 13px; word-break: break-all; text-decoration: underline;">
-                                    {direct_api_link}
+                                <a href="{verification_link}" style="color: #2563eb; font-size: 13px; word-break: break-all; text-decoration: underline;">
+                                    {verification_link}
                                 </a>
                             </div>
                             
@@ -194,7 +187,7 @@ def send_verification_email(user):
 Thank you for registering with Job Board.
 
 Please verify your email address by clicking the link below:
-{direct_api_link}
+{verification_link}
 
 This verification link will expire in 7 days.
 
@@ -280,6 +273,113 @@ def resend_verification_email(user):
         return False, "Email already verified"
     
     return send_verification_email(user)
+
+
+def send_password_reset_email(user):
+    """
+    Generate password reset token and send reset link via SendGrid / Resend / Email
+    Returns: (success: bool, message: str)
+    """
+    try:
+        token = generate_verification_token()
+        hashed_token = hashlib.sha256(token.encode()).hexdigest()
+        
+        user.password_reset_token = hashed_token
+        user.password_reset_sent_at = timezone.now()
+        user.save(update_fields=['password_reset_token', 'password_reset_sent_at'])
+        
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:8080')
+        reset_link = f"{frontend_url}/reset-password?token={token}&email={user.email}"
+        
+        subject = "🔑 Reset Your Password - Job Board"
+        
+        html_message = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin: 0; padding: 0; background-color: #f4f6f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f6f8; padding: 40px 10px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+                    <tr>
+                        <td style="background-color: #2563eb; padding: 32px 24px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">🔑 Password Reset Request</h1>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 36px 32px;">
+                            <h2 style="color: #1e293b; margin: 0 0 16px 0; font-size: 18px;">Hello, {user.get_full_name()}!</h2>
+                            <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">
+                                We received a request to reset your Job Board password. Click the button below to choose a new, secure password.
+                            </p>
+                            <div style="text-align: center; margin: 32px 0;">
+                                <a href="{reset_link}" style="background-color: #2563eb; color: #ffffff !important; display: inline-block; padding: 14px 32px; font-size: 15px; font-weight: 700; text-decoration: none; border-radius: 8px;">
+                                    Reset Password →
+                                </a>
+                            </div>
+                            <div style="margin: 28px 0; padding: 14px; background-color: #f8fafc; border-left: 4px solid #2563eb; border-radius: 4px;">
+                                <p style="margin: 0 0 6px 0; color: #334155; font-size: 12px; font-weight: 600;">Or copy this link:</p>
+                                <a href="{reset_link}" style="color: #2563eb; font-size: 12px; word-break: break-all;">{reset_link}</a>
+                            </div>
+                            <p style="color: #94a3b8; font-size: 12px; margin: 24px 0 0 0;">
+                                ⚠️ This link expires in 1 hour. If you didn't request a password reset, you can safely ignore this email.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>"""
+        
+        plain_message = f"Hello {user.get_full_name()},\n\nReset your Job Board password here:\n{reset_link}\n\nThis link expires in 1 hour."
+
+        sendgrid_key = os.getenv('SENDGRID_API_KEY')
+        if sendgrid_key:
+            try:
+                from_email = os.getenv('DEFAULT_FROM_EMAIL', 'mekdelawitkassa6@gmail.com')
+                if not from_email or 'noreply' in from_email:
+                    from_email = 'mekdelawitkassa6@gmail.com'
+                _send_via_sendgrid_https(sendgrid_key, from_email, user.email, subject, plain_message, html_message)
+                return True, "Password reset email sent successfully via SendGrid"
+            except Exception as e:
+                print(f"SendGrid failed: {e}")
+
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_message,
+            fail_silently=True,
+        )
+        return True, "Password reset email sent successfully"
+    except Exception as e:
+        return False, f"Failed to send password reset email: {str(e)}"
+
+
+def reset_password_with_token(user, token, new_password):
+    """
+    Verify reset token and set new password
+    Returns: (success: bool, message: str)
+    """
+    if not user or not user.password_reset_token:
+        return False, "No password reset request found for this account."
+    
+    hashed_token = hashlib.sha256(token.encode()).hexdigest()
+    if user.password_reset_token != hashed_token:
+        return False, "Invalid or expired password reset token."
+    
+    if user.is_password_reset_expired():
+        return False, "Password reset token has expired. Please request a new one."
+    
+    user.set_password(new_password)
+    user.password_reset_token = None
+    user.password_reset_sent_at = None
+    user.save(update_fields=['password', 'password_reset_token', 'password_reset_sent_at'])
+    
+    return True, "Password has been reset successfully. You can now sign in."
 
 
 def custom_exception_handler(exc, context):

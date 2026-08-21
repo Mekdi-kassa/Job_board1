@@ -300,7 +300,7 @@ EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', 5))
 # ============================================================
 EMAIL_VERIFICATION_REQUIRED = os.getenv('EMAIL_VERIFICATION_REQUIRED', 'True') == 'True'
 EMAIL_VERIFICATION_TIMEOUT_DAYS = int(os.getenv('EMAIL_VERIFICATION_TIMEOUT_DAYS', 7))
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:8080')
 
 # ============================================================
 # DEFAULT AUTO FIELD

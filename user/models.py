@@ -83,6 +83,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     email_verification_sent_at = models.DateTimeField(null=True, blank=True)
     email_verified_at = models.DateTimeField(null=True, blank=True)
     
+    # Password Reset Fields
+    password_reset_token = models.CharField(max_length=255, blank=True, null=True)
+    password_reset_sent_at = models.DateTimeField(null=True, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     last_login = models.DateTimeField(null=True, blank=True)
@@ -98,6 +102,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             models.Index(fields=['email', 'role']),
             models.Index(fields=['role', 'is_active']),
             models.Index(fields=['email_verification_token']),
+            models.Index(fields=['password_reset_token']),
         ]
     
     def __str__(self):
@@ -124,4 +129,12 @@ class User(AbstractBaseUser, PermissionsMixin):
             return True
         timeout_days = getattr(settings, 'EMAIL_VERIFICATION_TIMEOUT_DAYS', 7)
         expiration_time = self.email_verification_sent_at + timedelta(days=timeout_days)
+        return timezone.now() > expiration_time
+
+    def is_password_reset_expired(self):
+        """Check if password reset token has expired (1 hour limit)"""
+        if not self.password_reset_sent_at:
+            return True
+        timeout_hours = getattr(settings, 'PASSWORD_RESET_TIMEOUT_HOURS', 1)
+        expiration_time = self.password_reset_sent_at + timedelta(hours=timeout_hours)
         return timezone.now() > expiration_time

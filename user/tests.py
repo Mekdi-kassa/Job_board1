@@ -382,3 +382,82 @@ class AuthenticationAndLoginTestCase(APITestCase):
         self.client.credentials()  # Clear auth header
         second_refresh_res = self.client.post(self.refresh_url, {'refresh': new_refresh_token}, format='json')
         self.assertEqual(second_refresh_res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PasswordResetTestCase(APITestCase):
+    """Test suite for password reset request and confirmation"""
+    
+    def setUp(self):
+        self.request_url = reverse('user:password-reset-request')
+        self.confirm_url = reverse('user:password-reset-confirm')
+        
+        self.password = 'InitialPassword123!'
+        self.user = User.objects.create_user(
+            email='resettest@example.com',
+            password=self.password,
+            first_name='Reset',
+            last_name='User',
+            role=User.Role.APPLICANT,
+            is_active=True,
+            is_verified=True
+        )
+
+    def test_request_password_reset_success(self):
+        """Requesting a reset link generates a token and returns success"""
+        response = self.client.post(self.request_url, {'email': self.user.email}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['success'])
+        
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.password_reset_token)
+        self.assertIsNotNone(self.user.password_reset_sent_at)
+
+    def test_confirm_password_reset_success(self):
+        """Confirming reset with valid token and strong password updates password"""
+        # Request reset first
+        self.client.post(self.request_url, {'email': self.user.email}, format='json')
+        
+        # Manually generate matching token and hashed version
+        import secrets, hashlib
+        raw_token = secrets.token_urlsafe(32)
+        self.user.password_reset_token = hashlib.sha256(raw_token.encode()).hexdigest()
+        self.user.password_reset_sent_at = timezone.now()
+        self.user.save()
+        
+        new_password = 'BrandNewSecurePassword123!'
+        response = self.client.post(self.confirm_url, {
+            'email': self.user.email,
+            'token': raw_token,
+            'new_password': new_password,
+            'confirm_password': new_password
+        }, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['success'])
+        
+        # Verify user can log in with new password
+        login_url = reverse('user:login')
+        login_res = self.client.post(login_url, {
+            'email': self.user.email,
+            'password': new_password
+        }, format='json')
+        self.assertEqual(login_res.status_code, status.HTTP_200_OK)
+
+    def test_confirm_password_reset_fails_with_weak_password(self):
+        """Reset rejects weak passwords missing numbers/symbols/uppercase"""
+        import secrets, hashlib
+        raw_token = secrets.token_urlsafe(32)
+        self.user.password_reset_token = hashlib.sha256(raw_token.encode()).hexdigest()
+        self.user.password_reset_sent_at = timezone.now()
+        self.user.save()
+        
+        # Weak password (no number/symbol/uppercase)
+        response = self.client.post(self.confirm_url, {
+            'email': self.user.email,
+            'token': raw_token,
+            'new_password': 'weakpassword',
+            'confirm_password': 'weakpassword'
+        }, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(response.data['success'])
