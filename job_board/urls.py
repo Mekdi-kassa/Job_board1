@@ -25,6 +25,9 @@ urlpatterns = [
     
     # Dashboards & Analytics (Company hiring pipeline, applicant tracker, admin platform analytics)
     path('api/dashboard/', include('dashboard.urls')),
+    
+    # In-App Notifications & Email Alerts
+    path('api/notifications/', include('notifications.urls')),
 ]
 
 # Serve media files in development

@@ -18,6 +18,10 @@ from .utils import (
     send_company_new_applicant_email,
     send_application_status_update_email,
 )
+from notifications.services import (
+    notify_application_status_update,
+    notify_new_candidate
+)
 from jobs.models import Job
 from jobs.views import StandardResultsSetPagination
 from user.permissions import IsSuperAdmin
@@ -45,12 +49,12 @@ class JobApplyView(APIView):
         if serializer.is_valid():
             application = serializer.save()
 
-            # Trigger automated emails asynchronously/safely
+            # Trigger automated in-app notifications and emails asynchronously/safely
             try:
                 send_application_submitted_email(application)
-                send_company_new_applicant_email(application)
+                notify_new_candidate(application)
             except Exception as e:
-                print(f"Error triggering application emails: {e}")
+                print(f"Error triggering application notifications: {e}")
 
             return Response({
                 'success': True,
@@ -216,15 +220,15 @@ class CompanyApplicationDetailReviewView(APIView):
             updated_app = serializer.save()
             new_status = updated_app.status
 
-            # If status changed, update timestamp and send email notification
+            # If status changed, update timestamp and send in-app notification + email
             if new_status != old_status:
                 updated_app.status_updated_at = timezone.now()
                 updated_app.save(update_fields=['status_updated_at'])
 
                 try:
-                    send_application_status_update_email(updated_app)
+                    notify_application_status_update(updated_app)
                 except Exception as e:
-                    print(f"Error sending status update email: {e}")
+                    print(f"Error sending status update notification: {e}")
 
             return Response({
                 'success': True,
