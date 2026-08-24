@@ -158,3 +158,31 @@ class ApplicantProfileSerializer(serializers.ModelSerializer):
         if value:
             return bleach.clean(value.strip(), tags=['p', 'b', 'i', 'u', 'br', 'strong', 'em'], strip=True)
         return ""
+
+
+class TalentMarketplaceListSerializer(serializers.ModelSerializer):
+    """Vetted Talent Card for Marketplace Directory"""
+    user_id = serializers.UUIDField(source='user.id', read_only=True)
+    full_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    skills = SkillSerializer(many=True, read_only=True)
+    latest_experience = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ApplicantProfile
+        fields = [
+            'id', 'user_id', 'full_name', 'email', 'headline', 'avatar',
+            'location', 'skills', 'is_open_to_work', 'preferred_job_type',
+            'preferred_workplace_type', 'expected_salary', 'github_url',
+            'linkedin_url', 'portfolio_url', 'latest_experience', 'updated_at'
+        ]
+
+    def get_latest_experience(self, obj):
+        latest = obj.experiences.order_by('-start_date').first()
+        if latest:
+            return {
+                'position': latest.position,
+                'company_name': latest.company_name,
+                'is_current': latest.is_current
+            }
+        return None

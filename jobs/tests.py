@@ -351,3 +351,11 @@ class AdminJobModerationTests(JobManagementTestsBase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['data']['name'], "Data Science & AI")
         self.assertEqual(response.data['data']['slug'], "data-science-ai")
+
+    def test_admin_can_delete_job(self):
+        """Super admin can remove violating job posting"""
+        self.client.force_authenticate(user=self.admin_user)
+        url = reverse('jobs:admin-job-manage', kwargs={'pk': self.job_b1.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(Job.objects.filter(id=self.job_b1.id).exists())

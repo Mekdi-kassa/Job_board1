@@ -20,4 +20,9 @@ urlpatterns = [
 
     # Skills Endpoints
     path('skills/', views.SkillListCreateView.as_view(), name='skills-list-create'),
+
+    # Talent & Community Marketplace Endpoints
+    path('marketplace/overview/', views.MarketplaceOverviewView.as_view(), name='marketplace-overview'),
+    path('talent/', views.TalentMarketplaceListView.as_view(), name='talent-list'),
+    path('talent/<str:user_id_or_profile_id>/', views.TalentShowcaseDetailView.as_view(), name='talent-detail'),
 ]

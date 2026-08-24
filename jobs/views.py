@@ -332,3 +332,31 @@ class AdminCategoryManageView(APIView):
             'success': False,
             'errors': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminJobDetailManageView(APIView):
+    """
+    Super Admin manage / remove any job posting on the platform.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
+
+    def delete(self, request, pk):
+        job = get_object_or_404(Job, pk=pk)
+        job.delete()
+        return Response({
+            'success': True,
+            'message': 'Job posting removed by administrator.'
+        }, status=status.HTTP_200_OK)
+
+    def patch(self, request, pk):
+        job = get_object_or_404(Job, pk=pk)
+        status_val = request.data.get('status')
+        if status_val:
+            job.status = status_val
+            job.save(update_fields=['status', 'updated_at'])
+            return Response({
+                'success': True,
+                'message': f"Job status updated to {job.status}.",
+                'data': {'id': str(job.id), 'status': job.status}
+            })
+        return Response({'success': False, 'message': 'No status provided.'}, status=status.HTTP_400_BAD_REQUEST)

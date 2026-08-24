@@ -7,10 +7,12 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q
 
 from .models import CompanyProfile, ApplicantProfile, Skill, WorkExperience, Education
+from jobs.models import Job
 from .serializers import (
     CompanyProfileSerializer,
     CompanyPublicShowcaseSerializer,
     ApplicantProfileSerializer,
+    TalentMarketplaceListSerializer,
     SkillSerializer,
     WorkExperienceSerializer,
     EducationSerializer
@@ -281,3 +283,119 @@ class ApplicantEducationDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated, IsEducationOwner]
     serializer_class = EducationSerializer
     queryset = Education.objects.all()
+
+
+# ============================================================
+# TALENT & COMMUNITY MARKETPLACE VIEWS
+# ============================================================
+
+class TalentMarketplaceListView(generics.ListAPIView):
+    """
+    Authenticated Directory of verified candidates and talent.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = TalentMarketplaceListSerializer
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        queryset = ApplicantProfile.objects.select_related('user').prefetch_related('skills', 'experiences').filter(
+            user__is_active=True,
+            is_open_to_work=True
+        )
+
+        q = self.request.query_params.get('q')
+        if q:
+            queryset = queryset.filter(
+                Q(headline__icontains=q) |
+                Q(bio__icontains=q) |
+                Q(user__first_name__icontains=q) |
+                Q(user__last_name__icontains=q) |
+                Q(skills__name__icontains=q)
+            ).distinct()
+
+        skill = self.request.query_params.get('skill')
+        if skill:
+            queryset = queryset.filter(
+                Q(skills__name__iexact=skill) | Q(skills__slug__iexact=skill)
+            ).distinct()
+
+        job_type = self.request.query_params.get('job_type')
+        if job_type:
+            queryset = queryset.filter(preferred_job_type__iexact=job_type)
+
+        workplace_type = self.request.query_params.get('workplace_type')
+        if workplace_type:
+            queryset = queryset.filter(preferred_workplace_type__iexact=workplace_type)
+
+        location = self.request.query_params.get('location')
+        if location:
+            queryset = queryset.filter(location__icontains=location)
+
+        return queryset.order_by('-updated_at')
+
+
+class TalentShowcaseDetailView(APIView):
+    """
+    Authenticated view of an individual candidate's profile, experiences, and education.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, user_id_or_profile_id):
+        try:
+            val_uuid = uuid.UUID(str(user_id_or_profile_id))
+            profile = get_object_or_404(
+                ApplicantProfile.objects.select_related('user').prefetch_related('skills', 'experiences', 'educations'),
+                Q(pk=val_uuid) | Q(user__id=val_uuid)
+            )
+        except ValueError:
+            profile = get_object_or_404(
+                ApplicantProfile.objects.select_related('user').prefetch_related('skills', 'experiences', 'educations'),
+                user__username=user_id_or_profile_id
+            )
+
+        serializer = ApplicantProfileSerializer(profile)
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
+
+
+class MarketplaceOverviewView(APIView):
+    """
+    High-level marketplace hub statistics, featured talents, and top hiring companies.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        total_talents = ApplicantProfile.objects.filter(user__is_active=True, is_open_to_work=True).count()
+        total_companies = CompanyProfile.objects.filter(user__is_active=True).count()
+        active_jobs = Job.objects.filter(status=Job.Status.PUBLISHED).count()
+
+        featured_talents_qs = ApplicantProfile.objects.select_related('user').prefetch_related('skills', 'experiences').filter(
+            user__is_active=True,
+            is_open_to_work=True
+        ).order_by('-updated_at')[:6]
+        featured_talents = TalentMarketplaceListSerializer(featured_talents_qs, many=True).data
+
+        featured_companies_qs = CompanyProfile.objects.select_related('industry', 'user').filter(
+            user__is_active=True
+        ).order_by('-updated_at')[:6]
+        featured_companies = CompanyPublicShowcaseSerializer(featured_companies_qs, many=True).data
+
+        # Top skills
+        popular_skills_qs = Skill.objects.all()[:12]
+        popular_skills = SkillSerializer(popular_skills_qs, many=True).data
+
+        return Response({
+            'success': True,
+            'data': {
+                'metrics': {
+                    'total_talents': total_talents,
+                    'total_companies': total_companies,
+                    'active_jobs': active_jobs
+                },
+                'featured_talents': featured_talents,
+                'featured_companies': featured_companies,
+                'popular_skills': popular_skills
+            }
+        })

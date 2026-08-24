@@ -229,3 +229,55 @@ class ApplicantProfileAPITests(ProfilesTestBase):
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Education.objects.filter(id=edu.id).exists())
+
+
+class MarketplaceAPITests(ProfilesTestBase):
+    """Tests for Community and Talent Marketplace endpoints"""
+
+    def setUp(self):
+        super().setUp()
+        # Associate skills with applicant 1
+        self.app_profile_1.skills.add(self.skill_python, self.skill_django)
+        self.client.force_authenticate(user=self.applicant_1)
+
+    def test_unauthenticated_marketplace_access_denied(self):
+        """Unauthenticated requests are rejected with 401 Unauthorized"""
+        self.client.force_authenticate(user=None)
+        url = reverse('profiles:marketplace-overview')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_marketplace_overview(self):
+        """Get marketplace overview statistics and featured listings"""
+        url = reverse('profiles:marketplace-overview')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['success'])
+        self.assertIn('metrics', response.data['data'])
+        self.assertIn('featured_talents', response.data['data'])
+        self.assertIn('featured_companies', response.data['data'])
+
+    def test_talent_marketplace_list(self):
+        """List candidates open to work in the marketplace"""
+        url = reverse('profiles:talent-list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data.get('results', response.data)
+        self.assertGreaterEqual(len(results), 1)
+
+    def test_talent_marketplace_filter_by_skill(self):
+        """Filter talent marketplace by specific skill"""
+        url = reverse('profiles:talent-list') + '?skill=Python'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data.get('results', response.data)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['email'], 'applicant1@example.com')
+
+    def test_talent_showcase_detail(self):
+        """Public view of candidate detailed profile"""
+        url = reverse('profiles:talent-detail', kwargs={'user_id_or_profile_id': str(self.applicant_1.id)})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['success'])
+        self.assertEqual(response.data['data']['headline'], 'Senior Full Stack Developer')

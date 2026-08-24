@@ -17,6 +17,7 @@ urlpatterns = [
 
     # Admin Management
     path('admin/all/', views.AdminJobListView.as_view(), name='admin-all-jobs'),
+    path('admin/<uuid:pk>/', views.AdminJobDetailManageView.as_view(), name='admin-job-manage'),
     path('admin/<uuid:pk>/feature/', views.AdminJobToggleFeatureView.as_view(), name='admin-job-toggle-feature'),
     path('admin/categories/', views.AdminCategoryManageView.as_view(), name='admin-category-create'),
     path('admin/categories/<uuid:pk>/', views.AdminCategoryManageView.as_view(), name='admin-category-update'),
