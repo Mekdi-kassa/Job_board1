@@ -359,3 +359,67 @@ class AdminJobModerationTests(JobManagementTestsBase):
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(Job.objects.filter(id=self.job_b1.id).exists())
+
+
+class ProductMarketplaceTests(JobManagementTestsBase):
+    """Tests for ecommerce product marketplace listings, filtering, buying, and inquiry"""
+
+    def test_user_can_list_product(self):
+        """Authenticated user can list a digital product for sale"""
+        self.client.force_authenticate(user=self.applicant)
+        url = reverse('jobs:product-list-create')
+        data = {
+            "title": "FastAPI Microservices Boilerplate",
+            "category": "Software & SaaS",
+            "price": "39.99",
+            "currency": "USD",
+            "short_description": "Production-ready async backend starter kit.",
+            "description": "Includes Docker, JWT auth, Redis cache, and PostgreSQL models.",
+            "product_url": "https://gumroad.com/l/fastapi-boilerplate"
+        }
+        response = self.client.post(url, data=data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['data']['title'], "FastAPI Microservices Boilerplate")
+        self.assertEqual(float(response.data['data']['price']), 39.99)
+
+    def test_public_can_browse_and_filter_products(self):
+        """Anyone can browse products and filter by category or search query"""
+        from .models import Product
+        Product.objects.create(
+            seller=self.applicant,
+            title="React Native Crypto UI Kit",
+            category="Templates & Themes",
+            price=29.00
+        )
+        Product.objects.create(
+            seller=self.company_a,
+            title="Django Enterprise SaaS Starter",
+            category="Software & SaaS",
+            price=99.00
+        )
+
+        url = reverse('jobs:product-list-create')
+        response = self.client.get(url, {'category': 'Templates & Themes'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['title'], "React Native Crypto UI Kit")
+
+    def test_buyer_can_send_product_inquiry(self):
+        """Buyer can send message / inquiry to seller"""
+        from .models import Product
+        prod = Product.objects.create(
+            seller=self.company_a,
+            title="DevOps Kubernetes Pipeline Script",
+            category="Developer Tools",
+            price=49.00
+        )
+
+        url = reverse('jobs:product-inquiry-create', kwargs={'slug_or_id': prod.id})
+        data = {
+            "sender_name": "Jane Developer",
+            "sender_email": "jane@example.com",
+            "message": "Hi, does this include Terraform scripts for AWS?"
+        }
+        response = self.client.post(url, data=data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['data']['sender_name'], "Jane Developer")

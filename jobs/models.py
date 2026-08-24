@@ -143,3 +143,68 @@ class Job(models.Model):
         """Atomically increment views count"""
         Job.objects.filter(pk=self.pk).update(views_count=models.F('views_count') + 1)
         self.refresh_from_db(fields=['views_count'])
+
+
+class Product(models.Model):
+    """Ecommerce Marketplace Product Listing"""
+
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Active / Available'
+        SOLD_OUT = 'sold_out', 'Sold Out'
+        DRAFT = 'draft', 'Draft'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    seller = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='marketplace_products'
+    )
+    title = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=250, unique=True, blank=True)
+    category = models.CharField(max_length=100, default='Software & SaaS')
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    currency = models.CharField(max_length=10, default='USD')
+    image = models.ImageField(upload_to='product_covers/%Y/%m/', null=True, blank=True)
+    image_url = models.URLField(max_length=500, blank=True, default="")
+    short_description = models.CharField(max_length=255, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    product_url = models.URLField(max_length=400, blank=True, default="")
+    contact_email = models.EmailField(blank=True, default="")
+    contact_phone = models.CharField(max_length=30, blank=True, default="")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    is_featured = models.BooleanField(default=False)
+    rating = models.FloatField(default=5.0)
+    views_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'marketplace_products'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title} (${self.price})"
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.title)
+            uid_short = uuid.uuid4().hex[:6]
+            self.slug = f"{base_slug}-{uid_short}" if base_slug else uid_short
+        if not self.contact_email and self.seller_id:
+            self.contact_email = getattr(self.seller, 'email', '')
+        super().save(*args, **kwargs)
+
+
+class ProductInquiry(models.Model):
+    """Buyer inquiry sent to product seller"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='inquiries')
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    sender_name = models.CharField(max_length=120)
+    sender_email = models.EmailField()
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'product_inquiries'
+        ordering = ['-created_at']

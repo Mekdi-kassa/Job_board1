@@ -6,12 +6,14 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from .models import Category, Job
+from .models import Category, Job, Product, ProductInquiry
 from .serializers import (
     CategorySerializer,
     JobPublicListSerializer,
     JobDetailSerializer,
     JobCreateUpdateSerializer,
+    ProductSerializer,
+    ProductInquirySerializer,
 )
 from .permissions import IsCompany, IsVerifiedCompany, IsJobOwner
 from .filters import filter_jobs
@@ -368,3 +370,171 @@ class AdminJobDetailManageView(APIView):
                 'data': {'id': str(job.id), 'status': job.status}
             })
         return Response({'success': False, 'message': 'No status provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ============================================================
+# ECOMMERCE PRODUCT MARKETPLACE VIEWS
+# ============================================================
+
+class ProductListCreateView(APIView):
+    """
+    List active products or post a new product listing.
+    """
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
+
+    def get(self, request):
+        queryset = Product.objects.select_related('seller').filter(status=Product.Status.ACTIVE)
+
+        q = request.query_params.get('q')
+        if q:
+            queryset = queryset.filter(
+                Q(title__icontains=q) |
+                Q(description__icontains=q) |
+                Q(short_description__icontains=q) |
+                Q(category__icontains=q)
+            )
+
+        category = request.query_params.get('category')
+        if category and category != 'all':
+            queryset = queryset.filter(category__iexact=category)
+
+        min_price = request.query_params.get('min_price')
+        if min_price:
+            try:
+                queryset = queryset.filter(price__gte=float(min_price))
+            except ValueError:
+                pass
+
+        max_price = request.query_params.get('max_price')
+        if max_price:
+            try:
+                queryset = queryset.filter(price__lte=float(max_price))
+            except ValueError:
+                pass
+
+        sort = request.query_params.get('sort', '-created_at')
+        if sort == 'price_asc':
+            queryset = queryset.order_by('price')
+        elif sort == 'price_desc':
+            queryset = queryset.order_by('-price')
+        elif sort == 'popular':
+            queryset = queryset.order_by('-views_count', '-created_at')
+        else:
+            queryset = queryset.order_by('-created_at')
+
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = ProductSerializer(page, many=True, context={'request': request})
+        return paginator.get_paginated_response(serializer.data)
+
+    def post(self, request):
+        serializer = ProductSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            product = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'Product listed successfully.',
+                'data': ProductSerializer(product, context={'request': request}).data
+            }, status=status.HTTP_201_CREATED)
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProductDetailManageView(APIView):
+    """
+    Retrieve, update or delete a product listing.
+    """
+    def get_permissions(self):
+        if self.request.method in ['PATCH', 'PUT', 'DELETE']:
+            return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
+
+    def get_object(self, slug_or_id):
+        try:
+            return Product.objects.select_related('seller').get(pk=slug_or_id)
+        except (Product.DoesNotExist, ValueError):
+            return get_object_or_404(Product.objects.select_related('seller'), slug=slug_or_id)
+
+    def get(self, request, slug_or_id):
+        product = self.get_object(slug_or_id)
+        # Increment views atomically
+        Product.objects.filter(pk=product.pk).update(views_count=Product.objects.filter(pk=product.pk).values_list('views_count', flat=True)[0] + 1)
+        product.refresh_from_db(fields=['views_count'])
+        serializer = ProductSerializer(product, context={'request': request})
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
+
+    def patch(self, request, slug_or_id):
+        product = self.get_object(slug_or_id)
+        # Check permissions: only seller or admin
+        if product.seller != request.user and not (request.user.is_superuser or getattr(request.user, 'role', '') == 'admin'):
+            return Response({'success': False, 'message': 'You do not have permission to edit this product.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = ProductSerializer(product, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'success': True,
+                'message': 'Product updated successfully.',
+                'data': serializer.data
+            })
+        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, slug_or_id):
+        product = self.get_object(slug_or_id)
+        if product.seller != request.user and not (request.user.is_superuser or getattr(request.user, 'role', '') == 'admin'):
+            return Response({'success': False, 'message': 'You do not have permission to delete this product.'}, status=status.HTTP_403_FORBIDDEN)
+
+        product.delete()
+        return Response({
+            'success': True,
+            'message': 'Product removed from marketplace.'
+        }, status=status.HTTP_200_OK)
+
+
+class ProductInquiryCreateView(APIView):
+    """
+    Send buyer inquiry to product seller.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, slug_or_id):
+        try:
+            product = Product.objects.get(pk=slug_or_id)
+        except (Product.DoesNotExist, ValueError):
+            product = get_object_or_404(Product, slug=slug_or_id)
+
+        data = request.data.copy()
+        data['product'] = product.id
+        serializer = ProductInquirySerializer(data=data)
+        if serializer.is_valid():
+            inquiry = serializer.save(sender=request.user if request.user.is_authenticated else None)
+            return Response({
+                'success': True,
+                'message': 'Your inquiry has been sent to the seller.',
+                'data': serializer.data
+            }, status=status.HTTP_201_CREATED)
+        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MyProductsListView(APIView):
+    """
+    List authenticated user's own listed products.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        products = Product.objects.filter(seller=request.user).order_by('-created_at')
+        serializer = ProductSerializer(products, many=True, context={'request': request})
+        return Response({
+            'success': True,
+            'count': products.count(),
+            'data': serializer.data
+        })

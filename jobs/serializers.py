@@ -1,7 +1,7 @@
 import bleach
 from rest_framework import serializers
 from django.utils import timezone
-from .models import Category, Job
+from .models import Category, Job, Product, ProductInquiry
 from user.models import User
 
 
@@ -147,3 +147,55 @@ class JobCreateUpdateSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         validated_data['company'] = request.user
         return super().create(validated_data)
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    """Ecommerce Marketplace Product Listing Serializer"""
+    seller_id = serializers.UUIDField(source='seller.id', read_only=True)
+    seller_name = serializers.CharField(source='seller.get_full_name', read_only=True)
+    seller_email = serializers.EmailField(source='seller.email', read_only=True)
+    seller_avatar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'seller_id', 'seller_name', 'seller_email', 'seller_avatar',
+            'title', 'slug', 'category', 'price', 'currency',
+            'image', 'image_url', 'short_description', 'description',
+            'product_url', 'contact_email', 'contact_phone',
+            'status', 'is_featured', 'rating', 'views_count',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'slug', 'seller_id', 'seller_name', 'seller_email', 'views_count', 'created_at', 'updated_at']
+
+    def get_seller_avatar(self, obj):
+        if hasattr(obj.seller, 'applicant_profile') and obj.seller.applicant_profile.avatar:
+            return obj.seller.applicant_profile.avatar.url
+        if hasattr(obj.seller, 'company_profile') and obj.seller.company_profile.logo:
+            return obj.seller.company_profile.logo.url
+        return None
+
+    def validate_title(self, value):
+        import html
+        cleaned = html.unescape(bleach.clean(value.strip(), tags=[], strip=True))
+        if len(cleaned) < 3:
+            raise serializers.ValidationError("Product title must be at least 3 characters long.")
+        return cleaned
+
+    def validate_price(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Product price cannot be negative.")
+        return value
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        validated_data['seller'] = request.user
+        return super().create(validated_data)
+
+
+class ProductInquirySerializer(serializers.ModelSerializer):
+    """Product Buyer Inquiry Serializer"""
+    class Meta:
+        model = ProductInquiry
+        fields = ['id', 'product', 'sender', 'sender_name', 'sender_email', 'message', 'created_at']
+        read_only_fields = ['id', 'sender', 'created_at']

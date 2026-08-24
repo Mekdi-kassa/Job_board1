@@ -22,6 +22,12 @@ urlpatterns = [
     path('admin/categories/', views.AdminCategoryManageView.as_view(), name='admin-category-create'),
     path('admin/categories/<uuid:pk>/', views.AdminCategoryManageView.as_view(), name='admin-category-update'),
 
+    # Ecommerce Product Marketplace
+    path('products/', views.ProductListCreateView.as_view(), name='product-list-create'),
+    path('products/my-products/', views.MyProductsListView.as_view(), name='my-products-list'),
+    path('products/<str:slug_or_id>/', views.ProductDetailManageView.as_view(), name='product-detail-manage'),
+    path('products/<str:slug_or_id>/inquire/', views.ProductInquiryCreateView.as_view(), name='product-inquiry-create'),
+
     # Public Job Detail (Wildcard lookup by slug or UUID)
     path('<str:slug_or_id>/', views.JobPublicDetailView.as_view(), name='public-job-detail'),
 ]
