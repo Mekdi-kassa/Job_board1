@@ -215,6 +215,33 @@ class ApplicantAvatarUploadView(APIView):
         })
 
 
+class ApplicantResumeUploadView(APIView):
+    """
+    Upload applicant resume document (PDF, DOCX).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        profile, _ = ApplicantProfile.objects.get_or_create(user=request.user)
+        resume_file = request.FILES.get('resume')
+
+        if not resume_file:
+            return Response({
+                'success': False,
+                'message': 'No resume file provided.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        profile.resume = resume_file
+        profile.save(update_fields=['resume', 'updated_at'])
+
+        return Response({
+            'success': True,
+            'message': 'Resume uploaded successfully.',
+            'resume_url': profile.resume.url if profile.resume else None
+        })
+
+
 # ============================================================
 # SKILLS & EXPERIENCE & EDUCATION VIEWS
 # ============================================================

@@ -13,6 +13,7 @@ urlpatterns = [
     # Applicant Profile Endpoints
     path('applicant/me/', views.ApplicantMyProfileView.as_view(), name='applicant-my-profile'),
     path('applicant/me/avatar/', views.ApplicantAvatarUploadView.as_view(), name='applicant-avatar-upload'),
+    path('applicant/me/resume/', views.ApplicantResumeUploadView.as_view(), name='applicant-resume-upload'),
     path('applicant/me/experience/', views.ApplicantWorkExperienceListCreateView.as_view(), name='applicant-experience-list-create'),
     path('applicant/me/experience/<uuid:pk>/', views.ApplicantWorkExperienceDetailView.as_view(), name='applicant-experience-detail'),
     path('applicant/me/education/', views.ApplicantEducationListCreateView.as_view(), name='applicant-education-list-create'),
