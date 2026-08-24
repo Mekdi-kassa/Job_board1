@@ -165,15 +165,18 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Cloudinary Configuration
-if os.getenv('CLOUDINARY_CLOUD_NAME'):
+# Cloudinary Configuration (Only active when explicitly enabled with real credentials)
+cloudinary_cloud = os.getenv('CLOUDINARY_CLOUD_NAME')
+use_cloudinary = os.getenv('USE_CLOUDINARY', 'False').lower() in ('true', '1')
+
+if use_cloudinary and cloudinary_cloud and cloudinary_cloud != 'jobboard':
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
     CLOUDINARY_STORAGE = {
-        'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
+        'CLOUD_NAME': cloudinary_cloud,
         'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
         'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
     }
-    MEDIA_URL = f"https://res.cloudinary.com/{os.getenv('CLOUDINARY_CLOUD_NAME')}/"
+    MEDIA_URL = f"https://res.cloudinary.com/{cloudinary_cloud}/"
 else:
     MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
