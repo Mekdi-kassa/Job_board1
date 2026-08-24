@@ -67,11 +67,7 @@ class JobDetailSerializer(serializers.ModelSerializer):
 
 
 class JobCreateUpdateSerializer(serializers.ModelSerializer):
-    category_id = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.filter(is_active=True),
-        source='category',
-        write_only=True
-    )
+    category_id = serializers.CharField(write_only=True, required=False)
     category = CategorySerializer(read_only=True)
     company = JobCompanySummarySerializer(read_only=True)
 
@@ -124,6 +120,10 @@ class JobCreateUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        import uuid
+        from django.db.models import Q
+        from django.utils.text import slugify
+
         min_salary = attrs.get('min_salary')
         max_salary = attrs.get('max_salary')
 
@@ -139,6 +139,40 @@ class JobCreateUpdateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     "max_salary": "Maximum salary cannot be less than minimum salary."
                 })
+
+        # Resolve category from category_id or category field in initial_data
+        cat_input = attrs.pop('category_id', None) or self.initial_data.get('category') or self.initial_data.get('category_id')
+        if cat_input:
+            cat_obj = None
+            try:
+                cat_uuid = uuid.UUID(str(cat_input))
+                cat_obj = Category.objects.filter(id=cat_uuid).first()
+            except (ValueError, TypeError, AttributeError):
+                pass
+
+            if not cat_obj and isinstance(cat_input, str) and cat_input.strip():
+                cat_obj = Category.objects.filter(
+                    Q(slug__iexact=cat_input.strip()) | Q(name__iexact=cat_input.strip()),
+                    is_active=True
+                ).first()
+                if not cat_obj:
+                    cat_obj = Category.objects.create(
+                        name=cat_input.strip().title(),
+                        slug=slugify(cat_input.strip()) or 'general'
+                    )
+
+            if cat_obj:
+                attrs['category'] = cat_obj
+        elif not self.instance:
+            # If creating and no category supplied, assign or create default
+            cat_obj = Category.objects.filter(is_active=True).first()
+            if not cat_obj:
+                cat_obj = Category.objects.create(
+                    name="Technology & IT",
+                    slug="technology-it",
+                    description="Tech and engineering positions"
+                )
+            attrs['category'] = cat_obj
 
         return attrs
 
