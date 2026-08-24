@@ -121,7 +121,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.role == self.Role.APPLICANT
     
     def is_super_admin(self):
-        return self.role == self.Role.SUPER_ADMIN
+        return self.role in (self.Role.SUPER_ADMIN, 'admin') or self.is_superuser or self.is_staff
     
     def is_email_verification_expired(self):
         """Check if email verification token has expired"""

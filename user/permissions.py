@@ -6,7 +6,13 @@ from rest_framework import permissions
 class IsSuperAdmin(permissions.BasePermission):
     """Allow access only to Super Admin users"""
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role == 'super_admin'
+        return (
+            request.user.is_authenticated and (
+                request.user.role in ('super_admin', 'admin') or 
+                request.user.is_superuser or 
+                request.user.is_staff
+            )
+        )
 
 
 class IsCompany(permissions.BasePermission):
