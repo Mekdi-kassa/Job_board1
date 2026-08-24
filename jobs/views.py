@@ -333,6 +333,14 @@ class AdminCategoryManageView(APIView):
             'errors': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
 
+    def delete(self, request, pk):
+        category = get_object_or_404(Category, pk=pk)
+        category.delete()
+        return Response({
+            'success': True,
+            'message': 'Category deleted successfully.'
+        }, status=status.HTTP_200_OK)
+
 
 class AdminJobDetailManageView(APIView):
     """

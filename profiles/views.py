@@ -18,6 +18,7 @@ from .serializers import (
     EducationSerializer
 )
 from .permissions import IsExperienceOwner, IsEducationOwner
+from user.permissions import IsSuperAdmin
 from jobs.views import StandardResultsSetPagination
 
 
