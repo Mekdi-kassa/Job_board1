@@ -165,18 +165,23 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Cloudinary Configuration (Only active when explicitly enabled with real credentials)
+# Cloudinary Configuration (Supports CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME/KEY/SECRET)
+cloudinary_url = os.getenv('CLOUDINARY_URL')
 cloudinary_cloud = os.getenv('CLOUDINARY_CLOUD_NAME')
-use_cloudinary = os.getenv('USE_CLOUDINARY', 'False').lower() in ('true', '1')
+use_cloudinary = os.getenv('USE_CLOUDINARY', 'False').lower() in ('true', '1') or bool(cloudinary_url) or bool(cloudinary_cloud)
 
-if use_cloudinary and cloudinary_cloud and cloudinary_cloud != 'jobboard':
+if use_cloudinary and (cloudinary_cloud or cloudinary_url):
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-    CLOUDINARY_STORAGE = {
-        'CLOUD_NAME': cloudinary_cloud,
-        'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
-        'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
-    }
-    MEDIA_URL = f"https://res.cloudinary.com/{cloudinary_cloud}/"
+    if cloudinary_url:
+        import cloudinary
+        cloudinary.config(cloudinary_url=cloudinary_url)
+    elif cloudinary_cloud:
+        CLOUDINARY_STORAGE = {
+            'CLOUD_NAME': cloudinary_cloud,
+            'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
+            'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
+        }
+        MEDIA_URL = f"https://res.cloudinary.com/{cloudinary_cloud}/"
 else:
     MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
