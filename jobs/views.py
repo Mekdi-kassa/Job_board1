@@ -182,7 +182,11 @@ class CompanyMyJobsListView(generics.ListAPIView):
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        queryset = Job.objects.filter(company=self.request.user).select_related('category')
+        user = self.request.user
+        if user.is_superuser or getattr(user, 'role', '') == 'super_admin':
+            queryset = Job.objects.all().select_related('category', 'company')
+        else:
+            queryset = Job.objects.filter(company=user).select_related('category', 'company')
         status_param = self.request.query_params.get('status')
         if status_param:
             queryset = queryset.filter(status=status_param)

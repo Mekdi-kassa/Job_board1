@@ -90,7 +90,7 @@ class Job(models.Model):
     # Compensation
     min_salary = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     max_salary = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    salary_currency = models.CharField(max_length=10, default='USD')
+    salary_currency = models.CharField(max_length=10, default='ETB')
     salary_is_negotiable = models.BooleanField(default=False)
     is_salary_visible = models.BooleanField(default=True)
     
@@ -163,7 +163,7 @@ class Product(models.Model):
     slug = models.SlugField(max_length=250, unique=True, blank=True)
     category = models.CharField(max_length=100, default='Software & SaaS')
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    currency = models.CharField(max_length=10, default='USD')
+    currency = models.CharField(max_length=10, default='ETB')
     image = models.ImageField(upload_to='product_covers/%Y/%m/', null=True, blank=True)
     image_url = models.URLField(max_length=500, blank=True, default="")
     short_description = models.CharField(max_length=255, blank=True, default="")
@@ -183,7 +183,7 @@ class Product(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.title} (${self.price})"
+        return f"{self.title} ({self.price} {self.currency})"
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -202,6 +202,7 @@ class ProductInquiry(models.Model):
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     sender_name = models.CharField(max_length=120)
     sender_email = models.EmailField()
+    sender_phone = models.CharField(max_length=30, blank=True, default="")
     message = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 

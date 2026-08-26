@@ -15,6 +15,14 @@ urlpatterns = [
     path('my-jobs/<uuid:pk>/', views.CompanyJobDetailManageView.as_view(), name='company-job-detail'),
     path('my-jobs/<uuid:pk>/toggle-status/', views.CompanyJobToggleStatusView.as_view(), name='company-job-toggle-status'),
 
+    # Company alias routes for API client compatibility
+    path('company/create/', views.CompanyJobCreateView.as_view(), name='company-job-create-alt'),
+    path('company/my-jobs/', views.CompanyMyJobsListView.as_view(), name='company-my-jobs-alt'),
+    path('company/<uuid:pk>/', views.CompanyJobDetailManageView.as_view(), name='company-job-detail-alt'),
+    path('company/<uuid:pk>/update/', views.CompanyJobDetailManageView.as_view(), name='company-job-update'),
+    path('company/<uuid:pk>/toggle-status/', views.CompanyJobToggleStatusView.as_view(), name='company-job-toggle-status-alt'),
+    path('company/<uuid:pk>/delete/', views.CompanyJobDetailManageView.as_view(), name='company-job-delete'),
+
     # Admin Management
     path('admin/all/', views.AdminJobListView.as_view(), name='admin-all-jobs'),
     path('admin/<uuid:pk>/', views.AdminJobDetailManageView.as_view(), name='admin-job-manage'),

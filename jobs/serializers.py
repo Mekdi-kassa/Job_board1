@@ -221,6 +221,11 @@ class ProductSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Product price cannot be negative.")
         return value
 
+    def validate_contact_phone(self, value):
+        if not value or not str(value).strip():
+            raise serializers.ValidationError("A contact phone number is required so buyers can call you directly.")
+        return str(value).strip()
+
     def create(self, validated_data):
         request = self.context.get('request')
         validated_data['seller'] = request.user
@@ -231,5 +236,5 @@ class ProductInquirySerializer(serializers.ModelSerializer):
     """Product Buyer Inquiry Serializer"""
     class Meta:
         model = ProductInquiry
-        fields = ['id', 'product', 'sender', 'sender_name', 'sender_email', 'message', 'created_at']
+        fields = ['id', 'product', 'sender', 'sender_name', 'sender_email', 'sender_phone', 'message', 'created_at']
         read_only_fields = ['id', 'sender', 'created_at']
