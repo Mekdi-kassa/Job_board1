@@ -73,16 +73,28 @@ class ApplicantApplicationListSerializer(serializers.ModelSerializer):
 class CompanyCandidateApplicationSerializer(serializers.ModelSerializer):
     """Serializer for employers reviewing applicants"""
     applicant = UserSerializer(read_only=True)
+    applicant_name = serializers.CharField(source='applicant.get_full_name', read_only=True)
+    applicant_email = serializers.EmailField(source='applicant.email', read_only=True)
     job_title = serializers.CharField(source='job.title', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    profile = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
         fields = [
-            'id', 'job', 'job_title', 'applicant', 'resume', 'resume_url',
-            'cover_letter', 'status', 'status_display', 'rating', 'company_notes',
-            'applied_at', 'status_updated_at'
+            'id', 'job', 'job_title', 'applicant', 'applicant_name', 'applicant_email',
+            'profile', 'resume', 'resume_url', 'cover_letter', 'status',
+            'status_display', 'rating', 'company_notes', 'applied_at', 'status_updated_at'
         ]
+
+    def get_profile(self, obj):
+        try:
+            from profiles.models import ApplicantProfile
+            from profiles.serializers import ApplicantProfileSerializer
+            profile = ApplicantProfile.objects.select_related('user').prefetch_related('skills', 'experiences', 'educations').get(user=obj.applicant)
+            return ApplicantProfileSerializer(profile, context=self.context).data
+        except Exception:
+            return None
 
 
 class CompanyStatusUpdateSerializer(serializers.ModelSerializer):
