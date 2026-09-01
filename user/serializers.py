@@ -187,10 +187,19 @@ class ResendVerificationSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    avatar = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'username', 'role', 'is_verified', 'is_suspended', 'created_at']
+        fields = ['id', 'email', 'first_name', 'last_name', 'username', 'role', 'avatar', 'is_verified', 'is_suspended', 'created_at']
         read_only_fields = ['id', 'is_verified', 'is_suspended', 'created_at']
+
+    def get_avatar(self, obj):
+        if hasattr(obj, 'applicant_profile') and obj.applicant_profile.avatar:
+            return obj.applicant_profile.avatar.url
+        if hasattr(obj, 'company_profile') and obj.company_profile.logo:
+            return obj.company_profile.logo.url
+        return None
 
 
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
