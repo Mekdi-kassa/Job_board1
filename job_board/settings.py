@@ -165,12 +165,16 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Cloudinary Configuration (Supports CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME/KEY/SECRET)
+# Cloudinary Configuration (Supports CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME + KEY + SECRET)
 cloudinary_url = os.getenv('CLOUDINARY_URL')
 cloudinary_cloud = os.getenv('CLOUDINARY_CLOUD_NAME')
-use_cloudinary = os.getenv('USE_CLOUDINARY', 'False').lower() in ('true', '1') or bool(cloudinary_url) or bool(cloudinary_cloud)
+cloudinary_key = os.getenv('CLOUDINARY_API_KEY')
+cloudinary_secret = os.getenv('CLOUDINARY_API_SECRET')
 
-if use_cloudinary and (cloudinary_cloud or cloudinary_url):
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+if cloudinary_url or (cloudinary_cloud and cloudinary_key and cloudinary_secret):
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
     if cloudinary_url:
         import cloudinary
@@ -178,13 +182,10 @@ if use_cloudinary and (cloudinary_cloud or cloudinary_url):
     elif cloudinary_cloud:
         CLOUDINARY_STORAGE = {
             'CLOUD_NAME': cloudinary_cloud,
-            'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
-            'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
+            'API_KEY': cloudinary_key,
+            'API_SECRET': cloudinary_secret,
         }
         MEDIA_URL = f"https://res.cloudinary.com/{cloudinary_cloud}/"
-else:
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # ============================================================
 # FILE UPLOAD SETTINGS

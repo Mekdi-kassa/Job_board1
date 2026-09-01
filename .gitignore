@@ -31,7 +31,8 @@ local_settings.py
 *.swp
 *.swo
 *~
-.DS_Store
+*.DS_Store
+*.code-workspace
 
 # Testing
 .coverage

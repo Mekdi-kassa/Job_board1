@@ -23,13 +23,19 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class JobCompanySummarySerializer(serializers.ModelSerializer):
     company_name = serializers.SerializerMethodField()
+    logo = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'company_name', 'first_name', 'last_name']
+        fields = ['id', 'email', 'company_name', 'first_name', 'last_name', 'logo']
 
     def get_company_name(self, obj):
         return obj.get_full_name() or obj.username or obj.email
+
+    def get_logo(self, obj):
+        if hasattr(obj, 'company_profile') and obj.company_profile.logo:
+            return obj.company_profile.logo.url
+        return None
 
 
 class JobPublicListSerializer(serializers.ModelSerializer):
